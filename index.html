@@ -161,6 +161,7 @@ const MONTHS_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','No
 const fd=s=>{if(!s)return'';const d=parseD(s);return isEn()?d.getDate()+' '+MONTHS_EN[d.getMonth()]+' '+d.getFullYear():d.getDate()+' '+MONTHS_AR[d.getMonth()]+' '+d.getFullYear()};
 const fds=s=>{if(!s)return'';const d=parseD(s);return isEn()?d.getDate()+' '+MONTHS_EN[d.getMonth()]:d.getDate()+'/'+(d.getMonth()+1)};
 const mName=k=>{const m=Number(k.slice(5,7))-1;return isEn()?MONTHS_EN[m]:MONTHS_AR[m]};
+const MW=n=>'\u200E'+money(n)+'\u200E';
 const money=n=>(Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const N=n=>`<span class="num">${money(n)}</span>`;
 const toNum=s=>{s=String(s??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫]/g,'.').replace(/[,،\s]/g,'').replace(/−/g,'-');if(s===''||s==='-')return NaN;return Number(s)};
@@ -536,9 +537,9 @@ ACT.doSend=async d=>{const c=cust(V.id);const plans=sendPlan(c,d.mode);if(!plans
  await save();go('cust',{id:c.id});offerShare(pack)};
 ACT.reshare=async d=>{const c=cust(d.cid);const s=c.settlements.find(x=>x.no==d.no);await shareSettlements(c,[s])};
 ACT.sendFunding=async()=>{const c=cust(V.id);const items=V.items.filter(i=>i.label.trim()&&toNum(i.amount)>0).map(i=>({label:i.label.trim(),amount:toNum(i.amount)}));const tot=items.reduce((s,i)=>s+i.amount,0);const b=bal(c);const need=tot-b;if(need<=0)return;const p=S.profile;
- const txt=L(`طلب تمويل عهدة\n${p.nameAr} (${p.code}) · ${custName(c)}\n\n`+items.map((i,k)=>`${k+1}- ${money(i.amount)}  ${i.label}`).join('\n')+`\n\nإجمالي الاحتياجات: ${money(tot)}\nيخصم الرصيد الحالي: ${money(b)}\nمبلغ التمويل المطلوب: ${money(need)} ${c.cur}`,`Custody funding request\n${p.nameEn} (${p.code}) · ${custName(c)}\n\n`+items.map((i,k)=>`${k+1}- ${money(i.amount)}  ${i.label}`).join('\n')+`\n\nTotal needs: ${money(tot)}\nLess current balance: ${money(b)}\nFunding needed: ${money(need)} ${c.cur}`);
+ const txt=L(`طلب تمويل عهدة\n${p.nameAr} (${p.code}) · ${custName(c)}\n\n`+items.map((i,k)=>`${k+1}- ${MW(i.amount)}  ${i.label}`).join('\n')+`\n\nإجمالي الاحتياجات: ${MW(tot)}\nيخصم الرصيد الحالي: ${MW(b)}\nمبلغ التمويل المطلوب: ${MW(need)} ${c.cur}`,`Custody funding request\n${p.nameEn} (${p.code}) · ${custName(c)}\n\n`+items.map((i,k)=>`${k+1}- ${MW(i.amount)}  ${i.label}`).join('\n')+`\n\nTotal needs: ${MW(tot)}\nLess current balance: ${MW(b)}\nFunding needed: ${MW(need)} ${c.cur}`);
  S.lastFunding[c.id]={items,at:today()};await save();await shareText(txt)};
-ACT.deficit=async d=>{const c=cust(d.id);const b=bal(c);const p=S.profile;await shareText(L(`طلب تغطية عجز عهدة مؤقتة\n${p.nameAr} (${p.code})\n${c.purpose} · ${tNoS(c.tNo)}\nمبلغ العجز المطلوب: ${money(-b)} ${c.cur}`,`Temporary custody deficit request\n${p.nameEn} (${p.code})\n${c.purpose} · ${tNoS(c.tNo)}\nDeficit to cover: ${money(-b)} ${c.cur}`))};
+ACT.deficit=async d=>{const c=cust(d.id);const b=bal(c);const p=S.profile;await shareText(L(`طلب تغطية عجز عهدة مؤقتة\n${p.nameAr} (${p.code})\n${c.purpose} · ${tNoS(c.tNo)}\nمبلغ العجز المطلوب: ${MW(-b)} ${c.cur}`,`Temporary custody deficit request\n${p.nameEn} (${p.code})\n${c.purpose} · ${tNoS(c.tNo)}\nDeficit to cover: ${MW(-b)} ${c.cur}`))};
 ACT.cSet=d=>{readCreate();V.d[d.k]=d.v;if(d.k==='kind'&&d.v==='perm'&&perms().some(c=>c.cur===V.d.cur))V.d.cur=firstFreeCur();render()};
 function readCreate(){const d=V.d;['open','lastR','purpose','days'].forEach(k=>{const e=$(k);if(e)d[k]=e.value})}
 ACT.createSave=async()=>{readCreate();const d=V.d;const er=m=>{$('err').textContent=m};
@@ -549,7 +550,7 @@ ACT.createSave=async()=>{readCreate();const d=V.d;const er=m=>{$('err').textCont
  if(!d.purpose.trim())return er(L('اكتب الغرض من العهدة','Enter the purpose'));if(!(dd>0))return er(L('اكتب عدد الأيام المطلوبة','Enter the number of days'));if(!items.length)return er(L('اكتب بند واحد على الأقل بمبلغه','Enter at least one item with an amount'));
  let c;if(V.editId){c=cust(V.editId);c.purpose=d.purpose.trim();c.days=dd;c.items=items}else{S.tSeq++;c={id:uid(),kind:'temp',cur:d.cur,purpose:d.purpose.trim(),days:dd,items,tNo:S.tSeq,start:today(),status:'pending',fundedAt:null,ext:[],settlements:[]};S.custodies.push(c)}
  await save();const p=S.profile;const tot=items.reduce((s,i)=>s+i.amount,0);
- await shareText(L(`طلب عهدة مؤقتة ${tNoS(c.tNo)}\n${p.nameAr} (${p.code})\nالغرض: ${c.purpose}\nالمدة المطلوبة: ${c.days} يوم من تاريخ التحويل\n\n`+items.map((i,k)=>`${k+1}- ${money(i.amount)}  ${i.label}`).join('\n')+`\n\nمبلغ التمويل المطلوب: ${money(tot)} ${c.cur}`,`Temporary custody request ${tNoS(c.tNo)}\n${p.nameEn} (${p.code})\nPurpose: ${c.purpose}\nDays needed: ${c.days} from transfer date\n\n`+items.map((i,k)=>`${k+1}- ${money(i.amount)}  ${i.label}`).join('\n')+`\n\nFunding requested: ${money(tot)} ${c.cur}`));go('cust',{id:c.id})};
+ await shareText(L(`طلب عهدة مؤقتة ${tNoS(c.tNo)}\n${p.nameAr} (${p.code})\nالغرض: ${c.purpose}\nالمدة المطلوبة: ${c.days} يوم من تاريخ التحويل\n\n`+items.map((i,k)=>`${k+1}- ${MW(i.amount)}  ${i.label}`).join('\n')+`\n\nمبلغ التمويل المطلوب: ${MW(tot)} ${c.cur}`,`Temporary custody request ${tNoS(c.tNo)}\n${p.nameEn} (${p.code})\nPurpose: ${c.purpose}\nDays needed: ${c.days} from transfer date\n\n`+items.map((i,k)=>`${k+1}- ${MW(i.amount)}  ${i.label}`).join('\n')+`\n\nFunding requested: ${MW(tot)} ${c.cur}`));go('cust',{id:c.id})};
 ACT.editTemp=d=>{const c=cust(d.id);go('create',{editId:c.id,d:{kind:'temp',cur:c.cur,purpose:c.purpose,days:String(c.days),items:[...c.items.map(i=>({id:i.id,label:i.label,amount:String(i.amount)})),{label:'',amount:''}]}})};
 ACT.extN=d=>{V.why=val('why');V.n=(V.n||1)+Number(d.v);render()};
 ACT.extSave=async()=>{const c=cust(V.id);const why=val('why');if(!why){$('err').textContent=L('اكتب سبب التمديد','Enter a reason');return}const left=30-extUsed(c);const n=Math.min(V.n,left);if(n<1)return;c.ext.push({days:n,reason:why,date:today(),from:deadline(c)});await save();toast(L('اتمد الموعد لـ ','Deadline moved to ')+fd(deadline(c)));go('cust',{id:c.id})};
@@ -644,7 +645,7 @@ async function makeSettlementFiles(c,items){if(!window.XLSX||!window.jspdf||!win
   share.push(new File([blob],base+'.pdf',{type:'application/pdf'}));
   share.push(new File([csvOdoo(c,s,es)],base+'-odoo.csv',{type:'text/csv'}));
   local.push(new File([buildXlsx(c,s,es)],base+'.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  txt+=L(`تسوية عهدة ${rNo(s.no)}${c.kind==='temp'?' (قفل عهدة مؤقتة '+tNoS(c.tNo)+')':''}\n${S.profile.nameAr} (${S.profile.code})\nالفترة: ${fdFull(s.from)} - ${fdFull(s.to)}\nالمتبقي: \u2066${money(s.closing)} ${c.cur}\u2069\n\n`,`Custody settlement ${rNo(s.no)}${c.kind==='temp'?' (closing temporary custody '+tNoS(c.tNo)+')':''}\n${S.profile.nameEn} (${S.profile.code})\nPeriod: ${fdFull(s.from)} - ${fdFull(s.to)}\nRemaining: ${money(s.closing)} ${c.cur}\n\n`)}
+  txt+=L(`تسوية عهدة ${rNo(s.no)}${c.kind==='temp'?' (قفل عهدة مؤقتة '+tNoS(c.tNo)+')':''}\n${S.profile.nameAr} (${S.profile.code})\nالفترة: ${fdFull(s.from)} - ${fdFull(s.to)}\nالمتبقي: ${MW(s.closing)} ${c.cur}\n\n`,`Custody settlement ${rNo(s.no)}${c.kind==='temp'?' (closing temporary custody '+tNoS(c.tNo)+')':''}\n${S.profile.nameEn} (${S.profile.code})\nPeriod: ${fdFull(s.from)} - ${fdFull(s.to)}\nRemaining: ${money(s.closing)} ${c.cur}\n\n`)}
  if(S.attachData){const data={type:'maen-backup',v:1,full:false,at:new Date().toISOString(),state:S};share.push(new File([JSON.stringify(data)],`${pre}maen-data-${S.profile.code}-${today()}.txt`,{type:'text/plain'}))}
  busy(false);return{share,local,txt:txt.trim(),kind:'sett'}}
 let PENDING=null;
@@ -656,7 +657,7 @@ ${isB?`<button class="btn" data-a="saveBackupLocal">${L('احفظها على ا�
 <button class="btn" data-a="closeSheet">${L('بعدين','Later')}</button>`)}
 async function saveLocal(f){const dl=await getDownloads();if(dl){try{await dl.save({filename:f.name,data:f});return true}catch(e){return false}}try{const u=URL.createObjectURL(f);const a=document.createElement('a');a.href=u;a.download=f.name;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);return true}catch(e){return false}}
 ACT.doShare=async()=>{const p=PENDING;if(!p)return;let shared=false;
- try{if(navigator.canShare&&navigator.canShare({files:p.share})){await navigator.share({files:p.share,text:p.txt});shared=true}}catch(e){if(e&&e.name==='AbortError'){toast(L('اتلغى الإرسال، تقدر تبعت تاني من نفس الزرار','Sending cancelled — you can try again'));return}}
+ try{if(navigator.canShare&&navigator.canShare({files:p.share})){await navigator.share({files:p.share});shared=true}}catch(e){if(e&&e.name==='AbortError'){toast(L('اتلغى الإرسال، تقدر تبعت تاني من نفس الزرار','Sending cancelled — you can try again'));return}}
  for(const f of p.local)await saveLocal(f);
  if(p.kind==='backup'&&shared){S.lastBackup=today();await save()}
  if(shared){closeSheet();toast(p.local.length?L('اتبعت، والإكسيل الكامل اتحفظ في التنزيلات','Sent — the full Excel file is in Downloads'):L('تمام','Done'));if(V.name==='settings')render();return}
